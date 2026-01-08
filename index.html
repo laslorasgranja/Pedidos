@@ -1,488 +1,509 @@
-import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Trash2, Plus, Minus, ArrowLeft, Check, Truck, Store, MapPin, User, Banknote, Search, X, AlertCircle } from 'lucide-react';
-
-const CarniceriaApp = () => {
-  // --- Configuración y Datos ---
-  const CONFIG = {
-    nombreNegocio: "Las Loras Granja",
-    telefono: "5491128948821", // Número actualizado
-    alias: "GRANJA.CAMPO.FRESCA",
-    cbu: "0000003100000000000000",
-    costoEnvio: 1500,
-    montoEnvioGratis: 30000,
-  };
-
-  const PRODUCTOS = [
-    { id: 1, nombre: "Nalga", precioKg: 9000, categoria: "Milanesas" },
-    { id: 2, nombre: "Cuadrada", precioKg: 9000, categoria: "Milanesas" },
-    { id: 3, nombre: "Bola de Lomo", precioKg: 9000, categoria: "Milanesas" },
-    { id: 4, nombre: "Cuadril", precioKg: 9000, categoria: "Cortes" },
-    { id: 5, nombre: "Asado", precioKg: 8500, categoria: "Parrilla" },
-    { id: 6, nombre: "Vacío", precioKg: 9200, categoria: "Parrilla" },
-    { id: 7, nombre: "Carne Picada Especial", precioKg: 7000, categoria: "Diario" },
-    { id: 8, nombre: "Chorizo Puro Cerdo", precioKg: 6000, categoria: "Embutidos" },
-  ];
-
-  // --- Estados ---
-  const [carrito, setCarrito] = useState([]);
-  const [vista, setVista] = useState('tienda'); // tienda, carrito
-  const [tipoEntrega, setTipoEntrega] = useState('retiro'); // retiro, domicilio
-  const [mensajeExito, setMensajeExito] = useState(false);
-  const [busqueda, setBusqueda] = useState('');
-  
-  // Estados para manejo de persistencia (carrito guardado)
-  const [showResumeModal, setShowResumeModal] = useState(false);
-  const [pendingCart, setPendingCart] = useState([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // --- Opciones de Peso ---
-  const opcionesPeso = [
-    { label: "1/4 kg", valor: 0.25 },
-    { label: "1/2 kg", valor: 0.50 },
-    { label: "3/4 kg", valor: 0.75 },
-    { label: "1 kg", valor: 1.00 },
-  ];
-
-  // --- Efectos para Persistencia ---
-  
-  // 1. Al cargar la página, revisar si hay algo guardado
-  useEffect(() => {
-    const saved = localStorage.getItem('carrito_granja');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.length > 0) {
-          setPendingCart(parsed);
-          setShowResumeModal(true);
-          return; 
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Las Loras Granja</title>
+    <!-- Tailwind CSS para estilos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons para los íconos -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Animaciones personalizadas */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
-      } catch (e) {
-        console.error("Error al leer carrito guardado", e);
-      }
-    }
-    setIsInitialized(true); // Si no hay nada guardado, inicializamos normal
-  }, []);
+        .animate-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-900">
 
-  // 2. Guardar automáticamente cada vez que cambia el carrito (solo si ya se inicializó)
-  useEffect(() => {
-    if (isInitialized) {
-      localStorage.setItem('carrito_granja', JSON.stringify(carrito));
-    }
-  }, [carrito, isInitialized]);
-
-  // --- Manejadores del Modal de Restauración ---
-  const handleResumeCart = () => {
-    setCarrito(pendingCart);
-    setIsInitialized(true);
-    setShowResumeModal(false);
-  };
-
-  const handleNewCart = () => {
-    setCarrito([]);
-    localStorage.removeItem('carrito_granja');
-    setIsInitialized(true);
-    setShowResumeModal(false);
-  };
-
-
-  // --- Funciones Auxiliares ---
-  const formatPrecio = (valor) => {
-    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(valor);
-  };
-
-  const calcularTotalProductos = () => {
-    return carrito.reduce((total, item) => total + (item.precioKg * item.cantidad), 0);
-  };
-
-  const calcularCostoEnvio = () => {
-    if (tipoEntrega === 'retiro') return 0;
-    const subtotal = calcularTotalProductos();
-    return subtotal >= CONFIG.montoEnvioGratis ? 0 : CONFIG.costoEnvio;
-  };
-
-  const calcularTotalFinal = () => {
-    return calcularTotalProductos() + calcularCostoEnvio();
-  };
-
-  // --- Lógica del Carrito ---
-  const agregarAlCarrito = (producto, peso) => {
-    const itemExistenteIndex = carrito.findIndex(item => item.id === producto.id && item.pesoSeleccionado === peso);
-    
-    if (itemExistenteIndex >= 0) {
-      const nuevoCarrito = [...carrito];
-      nuevoCarrito[itemExistenteIndex].cantidad += 1; // Sumamos una unidad de ese peso
-      setCarrito(nuevoCarrito);
-    } else {
-      setCarrito([...carrito, { 
-        ...producto, 
-        pesoSeleccionado: peso, 
-        cantidad: 1,
-        cartId: Date.now() // ID único para el carrito
-      }]);
-    }
-    
-    // Pequeña animación visual (feedback)
-    setMensajeExito(true);
-    setTimeout(() => setMensajeExito(false), 1500);
-  };
-
-  const eliminarDelCarrito = (cartId) => {
-    setCarrito(carrito.filter(item => item.cartId !== cartId));
-  };
-
-  const enviarPedidoWhatsApp = () => {
-    const linea = "%0A";
-    let mensaje = `Hola *${CONFIG.nombreNegocio}*, quiero realizar el siguiente pedido:${linea}${linea}`;
-    
-    carrito.forEach(item => {
-      const pesoTexto = opcionesPeso.find(op => op.valor === item.pesoSeleccionado)?.label || `${item.pesoSeleccionado}kg`;
-      mensaje += `▪️ ${item.cantidad}x ${item.nombre} (${pesoTexto}) - ${formatPrecio(item.precioKg * item.pesoSeleccionado * item.cantidad)}${linea}`;
-    });
-
-    const costoEnvio = calcularCostoEnvio();
-    mensaje += `${linea}*Subtotal Productos:* ${formatPrecio(calcularTotalProductos())}`;
-    
-    if (tipoEntrega === 'domicilio') {
-        mensaje += `${linea}*Envío (a coordinar):* ${costoEnvio === 0 ? 'GRATIS' : formatPrecio(costoEnvio)}`;
-    }
-    
-    mensaje += `${linea}*TOTAL ESTIMADO: ${formatPrecio(calcularTotalFinal())}*${linea}${linea}`;
-    
-    if (tipoEntrega === 'domicilio') {
-        mensaje += `(Opción seleccionada: Envío a domicilio)${linea}`;
-    } else {
-        mensaje += `(Opción seleccionada: Retiro por el local)${linea}`;
-    }
-
-    mensaje += `${linea}Les paso mis datos y dirección por acá para coordinar el pago y la entrega.`;
-
-    // Limpiamos el carrito local al enviar, asumiendo que ya se procesó
-    // Opcional: si prefieres que quede hasta que ellos lo borren manualmente, comenta las siguientes dos líneas.
-    // setCarrito([]);
-    // localStorage.removeItem('carrito_granja');
-
-    window.open(`https://wa.me/${CONFIG.telefono}?text=${mensaje}`, '_blank');
-  };
-
-  // --- Filtrado de Productos ---
-  const productosFiltrados = PRODUCTOS.filter(producto => 
-    producto.nombre.toLowerCase().includes(busqueda.toLowerCase())
-  );
-
-  // --- Componentes de Vista ---
-
-  // 1. Cabecera
-  const Header = () => (
-    <div className="bg-green-800 text-white p-4 sticky top-0 z-50 shadow-md flex justify-between items-center">
-      <div>
-        <h1 className="text-xl font-bold">{CONFIG.nombreNegocio}</h1>
-        <p className="text-xs text-green-200">Calidad de campo</p>
-      </div>
-      <div className="relative cursor-pointer" onClick={() => setVista('carrito')}>
-        <div className="bg-white text-green-800 p-2 rounded-full">
-          <ShoppingCart size={24} />
-        </div>
-        {carrito.length > 0 && (
-          <span className="absolute -top-1 -right-1 bg-yellow-400 text-green-900 font-bold text-xs w-5 h-5 flex items-center justify-center rounded-full">
-            {carrito.length}
-          </span>
-        )}
-      </div>
+    <!-- Contenedor Principal -->
+    <div id="app" class="min-h-screen flex flex-col justify-between pb-20">
+        <!-- El contenido se inyectará aquí con JavaScript -->
     </div>
-  );
 
-  // 2. Tarjeta de Producto
-  const ProductoCard = ({ producto }) => {
-    const [peso, setPeso] = useState(1.00);
+    <script>
+        // --- CONFIGURACIÓN Y DATOS ---
+        const CONFIG = {
+            nombreNegocio: "Las Loras Granja",
+            telefono: "5491128948821",
+            alias: "GRANJA.CAMPO.FRESCA",
+            costoEnvio: 1500,
+            montoEnvioGratis: 30000,
+        };
 
-    return (
-      <div className="bg-white rounded-lg shadow-md border border-gray-200 p-4 mb-4">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold text-gray-800">{producto.nombre}</h3>
-          <span className="bg-green-100 text-green-800 text-sm font-semibold px-2 py-1 rounded">
-            {formatPrecio(producto.precioKg)}/kg
-          </span>
-        </div>
-        
-        <div className="text-gray-600 text-sm mb-3">
-          Seleccioná la cantidad:
-        </div>
+        const PRODUCTOS = [
+            { id: 1, nombre: "Nalga", precioKg: 9000, categoria: "Milanesas" },
+            { id: 2, nombre: "Cuadrada", precioKg: 9000, categoria: "Milanesas" },
+            { id: 3, nombre: "Bola de Lomo", precioKg: 9000, categoria: "Milanesas" },
+            { id: 4, nombre: "Cuadril", precioKg: 9000, categoria: "Cortes" },
+            { id: 5, nombre: "Asado", precioKg: 8500, categoria: "Parrilla" },
+            { id: 6, nombre: "Vacío", precioKg: 9200, categoria: "Parrilla" },
+            { id: 7, nombre: "Carne Picada Especial", precioKg: 7000, categoria: "Diario" },
+            { id: 8, nombre: "Chorizo Puro Cerdo", precioKg: 6000, categoria: "Embutidos" },
+        ];
 
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          {opcionesPeso.map((op) => (
-            <button
-              key={op.label}
-              onClick={() => setPeso(op.valor)}
-              className={`py-2 text-sm rounded-md font-medium transition-colors ${
-                peso === op.valor 
-                  ? 'bg-green-700 text-white shadow-sm' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {op.label}
-            </button>
-          ))}
-        </div>
+        const OPCIONES_PESO = [
+            { label: "1/4 kg", valor: 0.25 },
+            { label: "1/2 kg", valor: 0.50 },
+            { label: "3/4 kg", valor: 0.75 },
+            { label: "1 kg", valor: 1.00 },
+        ];
 
-        <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-          <div className="text-sm text-gray-600">
-            Total estimado:<br/>
-            <span className="text-lg font-bold text-gray-900">
-              {formatPrecio(producto.precioKg * peso)}
-            </span>
-          </div>
-          <button
-            onClick={() => agregarAlCarrito(producto, peso)}
-            className="bg-green-600 active:bg-green-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm"
-          >
-            <Plus size={20} /> AGREGAR
-          </button>
-        </div>
-      </div>
-    );
-  };
+        // --- ESTADO DE LA APLICACIÓN ---
+        let state = {
+            carrito: [],
+            vista: 'tienda', // 'tienda' o 'carrito'
+            tipoEntrega: 'retiro', // 'retiro' o 'domicilio'
+            busqueda: '',
+            mensajeExito: false,
+            showResumeModal: false,
+            pendingCart: [],
+            pesosSeleccionados: {} // Almacena el peso seleccionado actual para cada producto { idProducto: valorPeso }
+        };
 
-  // --- Renderizado Principal ---
+        // --- FUNCIONES DE LÓGICA ---
 
-  return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans flex flex-col justify-between">
-      
-      {/* Modal de Recuperación de Carrito */}
-      {showResumeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in fade-in zoom-in duration-300">
-            <div className="flex flex-col items-center text-center mb-6">
-              <div className="bg-yellow-100 p-3 rounded-full mb-4">
-                <AlertCircle className="text-yellow-600" size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900">¿Querés continuar tu compra?</h3>
-              <p className="text-gray-600 mt-2">
-                Encontramos productos que elegiste en tu visita anterior.
-              </p>
-            </div>
+        function init() {
+            // Inicializar pesos por defecto a 1kg
+            PRODUCTOS.forEach(p => state.pesosSeleccionados[p.id] = 1.00);
+
+            // Verificar persistencia
+            try {
+                const saved = localStorage.getItem('carrito_granja');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        state.pendingCart = parsed;
+                        state.showResumeModal = true;
+                    }
+                }
+            } catch (e) {
+                console.error("Error al leer caché:", e);
+                localStorage.removeItem('carrito_granja');
+            }
+
+            render();
+        }
+
+        function saveCart() {
+            localStorage.setItem('carrito_granja', JSON.stringify(state.carrito));
+        }
+
+        function handleResumeCart() {
+            state.carrito = state.pendingCart;
+            state.showResumeModal = false;
+            saveCart();
+            render();
+        }
+
+        function handleNewCart() {
+            state.carrito = [];
+            state.showResumeModal = false;
+            localStorage.removeItem('carrito_granja');
+            render();
+        }
+
+        function formatPrecio(valor) {
+            return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(valor);
+        }
+
+        function updatePeso(idProducto, valor) {
+            state.pesosSeleccionados[idProducto] = valor;
+            render();
+        }
+
+        function agregarAlCarrito(idProducto) {
+            const producto = PRODUCTOS.find(p => p.id === idProducto);
+            const peso = state.pesosSeleccionados[idProducto];
             
-            <div className="space-y-3">
-              <button 
-                onClick={handleResumeCart}
-                className="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors"
-              >
-                Sí, recuperar productos
-              </button>
-              <button 
-                onClick={handleNewCart}
-                className="w-full bg-gray-100 text-gray-600 py-3 rounded-lg font-bold hover:bg-gray-200 transition-colors"
-              >
-                No, empezar de cero
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            const itemIndex = state.carrito.findIndex(item => item.id === idProducto && item.pesoSeleccionado === peso);
 
-      <div>
-      {/* Notificación Flotante */}
-      {mensajeExito && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-xl z-50 font-medium flex items-center gap-2 animate-bounce">
-          <Check size={20} /> ¡Producto agregado!
-        </div>
-      )}
+            if (itemIndex >= 0) {
+                state.carrito[itemIndex].cantidad += 1;
+            } else {
+                state.carrito.push({
+                    ...producto,
+                    pesoSeleccionado: peso,
+                    cantidad: 1,
+                    cartId: Date.now()
+                });
+            }
 
-      {/* Vista: Tienda (Listado) */}
-      {vista === 'tienda' && (
-        <>
-          <Header />
-          <div className="p-4 max-w-md mx-auto">
-            <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded shadow-sm">
-              <p className="font-bold text-lg mb-2">🛒 ¿Cómo hacer tu pedido?</p>
-              <ul className="space-y-2 text-sm">
-                <li>1. Primero tocá el peso que querés (1/4, 1/2, 1 kilo, etc).</li>
-                <li><strong>2. Tocá el botón verde "AGREGAR". Si querés llevar más cantidad (por ejemplo 2 kilos), volvé a tocar el botón las veces que necesites.</strong></li>
-                <li>3. Cuando termines de elegir todo, tocá el dibujo del changuito arriba a la derecha.</li>
-              </ul>
-            </div>
+            saveCart();
+            state.mensajeExito = true;
+            render();
+            
+            setTimeout(() => {
+                state.mensajeExito = false;
+                render(); // Re-render para quitar mensaje
+            }, 1500);
+        }
 
-            {/* Barra de Búsqueda */}
-            <div className="mb-6 relative">
-              <Search className="absolute left-3 top-3.5 text-gray-400" size={20} />
-              <input 
-                type="text" 
-                placeholder="¿Qué estás buscando? (Ej: Asado)" 
-                className="w-full p-3 pl-10 border-2 border-green-600 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-              />
-              {busqueda && (
-                <button 
-                  onClick={() => setBusqueda('')}
-                  className="absolute right-3 top-3.5 text-gray-400"
-                >
-                  <X size={20} />
-                </button>
-              )}
-            </div>
+        function eliminarDelCarrito(cartId) {
+            state.carrito = state.carrito.filter(item => item.cartId !== cartId);
+            saveCart();
+            render();
+        }
 
-            {productosFiltrados.length > 0 ? (
-              productosFiltrados.map(prod => (
-                <ProductoCard key={prod.id} producto={prod} />
-              ))
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p className="text-lg">No encontramos productos con ese nombre.</p>
-                <button 
-                  onClick={() => setBusqueda('')}
-                  className="mt-2 text-green-700 font-bold underline"
-                >
-                  Ver todos los productos
-                </button>
-              </div>
-            )}
-          </div>
-          
-          {/* Botón flotante inferior para ver carrito si hay productos */}
-          {carrito.length > 0 && (
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg z-40 max-w-md mx-auto">
-               <button 
-                onClick={() => setVista('carrito')}
-                className="w-full bg-green-800 text-white py-3 rounded-xl font-bold text-lg shadow-md flex justify-between px-6"
-               >
-                 <span>Ver mi Pedido ({carrito.length})</span>
-                 <span>{formatPrecio(calcularTotalProductos())}</span>
-               </button>
-            </div>
-          )}
-        </>
-      )}
+        function cambiarVista(vista) {
+            state.vista = vista;
+            window.scrollTo(0, 0);
+            render();
+        }
 
-      {/* Vista: Carrito */}
-      {vista === 'carrito' && (
-        <div className="max-w-md mx-auto bg-white">
-          <div className="bg-gray-100 p-4 flex items-center gap-4 sticky top-0 shadow-sm z-10">
-            <button onClick={() => setVista('tienda')} className="p-2 bg-white rounded-full shadow text-gray-700">
-              <ArrowLeft size={24} />
-            </button>
-            <h2 className="text-xl font-bold text-gray-800">Tu Pedido</h2>
-          </div>
+        function cambiarEntrega(tipo) {
+            state.tipoEntrega = tipo;
+            render();
+        }
 
-          <div className="p-4">
-            {carrito.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">
-                <ShoppingCart size={64} className="mx-auto mb-4 text-gray-300" />
-                <p className="text-lg">El carrito está vacío</p>
-                <button onClick={() => setVista('tienda')} className="mt-4 text-green-700 font-bold underline">
-                  Volver a ver productos
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-4 mb-8">
-                  {carrito.map((item) => {
-                    const labelPeso = opcionesPeso.find(o => o.valor === item.pesoSeleccionado)?.label;
-                    return (
-                      <div key={item.cartId} className="flex justify-between items-center border-b border-gray-100 pb-4">
-                        <div>
-                          <h4 className="font-bold text-lg">{item.nombre}</h4>
-                          <div className="text-gray-600">
-                            {item.cantidad} x {labelPeso} <span className="text-xs text-gray-400">({formatPrecio(item.precioKg)}/kg)</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-lg text-gray-800">
-                            {formatPrecio(item.precioKg * item.pesoSeleccionado * item.cantidad)}
-                          </span>
-                          <button 
-                            onClick={() => eliminarDelCarrito(item.cartId)}
-                            className="bg-red-50 text-red-600 p-2 rounded-full"
-                          >
-                            <Trash2 size={20} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+        function actualizarBusqueda(texto) {
+            state.busqueda = texto;
+            render();
+        }
 
-                <div className="bg-gray-50 p-4 rounded-xl mb-6">
-                   <h3 className="font-bold text-lg mb-3">¿Cómo querés recibirlo?</h3>
-                   <div className="flex gap-2">
-                      <button 
-                        onClick={() => setTipoEntrega('retiro')}
-                        className={`flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 ${tipoEntrega === 'retiro' ? 'border-green-700 bg-green-50 text-green-900' : 'border-gray-200 bg-white text-gray-500'}`}
-                      >
-                        <Store size={24} />
-                        <span className="font-bold text-sm">Retiro en Local</span>
-                      </button>
-                      <button 
-                        onClick={() => setTipoEntrega('domicilio')}
-                        className={`flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 ${tipoEntrega === 'domicilio' ? 'border-green-700 bg-green-50 text-green-900' : 'border-gray-200 bg-white text-gray-500'}`}
-                      >
-                        <Truck size={24} />
-                        <span className="font-bold text-sm">Envío a Casa</span>
-                      </button>
-                   </div>
-                   
-                   {tipoEntrega === 'domicilio' && (
-                     <div className="mt-3 text-sm text-gray-600 bg-white p-3 rounded border border-gray-200">
-                        {calcularTotalProductos() >= CONFIG.montoEnvioGratis ? (
-                           <span className="text-green-600 font-bold flex items-center gap-1">
-                             <Check size={16} /> ¡Tenés envío GRATIS!
-                           </span>
-                        ) : (
-                           <span>Costo de envío estimado: <strong>{formatPrecio(CONFIG.costoEnvio)}</strong><br/>
-                           <span className="text-xs text-orange-600">Faltan {formatPrecio(CONFIG.montoEnvioGratis - calcularTotalProductos())} para envío gratis.</span>
-                           </span>
-                        )}
-                     </div>
-                   )}
-                </div>
+        function calcularTotalProductos() {
+            return state.carrito.reduce((total, item) => total + (item.precioKg * item.cantidad), 0);
+        }
 
-                <div className="border-t border-gray-200 pt-4 space-y-2 text-lg">
-                   <div className="flex justify-between text-gray-600">
-                     <span>Subtotal</span>
-                     <span>{formatPrecio(calcularTotalProductos())}</span>
-                   </div>
-                   {tipoEntrega === 'domicilio' && (
-                    <div className="flex justify-between text-gray-600">
-                      <span>Envío (estimado)</span>
-                      <span>{calcularCostoEnvio() === 0 ? 'Bonificado' : formatPrecio(calcularCostoEnvio())}</span>
+        function calcularCostoEnvio() {
+            if (state.tipoEntrega === 'retiro') return 0;
+            const subtotal = calcularTotalProductos();
+            return subtotal >= CONFIG.montoEnvioGratis ? 0 : CONFIG.costoEnvio;
+        }
+
+        function calcularTotalFinal() {
+            return calcularTotalProductos() + calcularCostoEnvio();
+        }
+
+        function enviarPedidoWhatsApp() {
+            const linea = "%0A";
+            let mensaje = `Hola *${CONFIG.nombreNegocio}*, quiero realizar el siguiente pedido:${linea}${linea}`;
+            
+            state.carrito.forEach(item => {
+                const pesoOption = OPCIONES_PESO.find(op => op.valor === item.pesoSeleccionado);
+                const pesoTexto = pesoOption ? pesoOption.label : `${item.pesoSeleccionado}kg`;
+                mensaje += `▪️ ${item.cantidad}x ${item.nombre} (${pesoTexto}) - ${formatPrecio(item.precioKg * item.pesoSeleccionado * item.cantidad)}${linea}`;
+            });
+
+            const costoEnvio = calcularCostoEnvio();
+            mensaje += `${linea}*Subtotal Productos:* ${formatPrecio(calcularTotalProductos())}`;
+            
+            if (state.tipoEntrega === 'domicilio') {
+                mensaje += `${linea}*Envío (a coordinar):* ${costoEnvio === 0 ? 'GRATIS' : formatPrecio(costoEnvio)}`;
+            }
+            
+            mensaje += `${linea}*TOTAL ESTIMADO: ${formatPrecio(calcularTotalFinal())}*${linea}${linea}`;
+            
+            if (state.tipoEntrega === 'domicilio') {
+                mensaje += `(Opción seleccionada: Envío a domicilio)${linea}`;
+            } else {
+                mensaje += `(Opción seleccionada: Retiro por el local)${linea}`;
+            }
+
+            mensaje += `${linea}Les paso mis datos y dirección por acá para coordinar el pago y la entrega.`;
+
+            window.open(`https://wa.me/${CONFIG.telefono}?text=${mensaje}`, '_blank');
+        }
+
+        // --- RENDERIZADO (TEMPLATES HTML) ---
+
+        function renderHeader() {
+            const count = state.carrito.length;
+            return `
+                <div class="bg-green-800 text-white p-4 sticky top-0 z-50 shadow-md flex justify-between items-center">
+                    <div>
+                        <h1 class="text-xl font-bold">${CONFIG.nombreNegocio}</h1>
+                        <p class="text-xs text-green-200">Calidad de campo</p>
                     </div>
-                   )}
-                   <div className="flex justify-between font-bold text-2xl text-gray-900 pt-2">
-                     <span>Total Estimado</span>
-                     <span>{formatPrecio(calcularTotalFinal())}</span>
-                   </div>
-                   <p className="text-xs text-center text-gray-500 mt-2">
-                     * El costo final y el pago se coordinan por WhatsApp
-                   </p>
+                    <div class="relative cursor-pointer" onclick="cambiarVista('carrito')">
+                        <div class="bg-white text-green-800 p-2 rounded-full">
+                            <i data-lucide="shopping-cart" width="24" height="24"></i>
+                        </div>
+                        ${count > 0 ? `<span class="absolute -top-1 -right-1 bg-yellow-400 text-green-900 font-bold text-xs w-5 h-5 flex items-center justify-center rounded-full">${count}</span>` : ''}
+                    </div>
                 </div>
+            `;
+        }
 
-                <button 
-                  onClick={enviarPedidoWhatsApp}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 animate-pulse mt-8"
-                >
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WA" className="w-6 h-6" />
-                  ENVIAR PEDIDO A WHATSAPP
-                </button>
-                <p className="text-center text-sm text-gray-500 mt-4 px-4">
-                  Al tocar el botón se abrirá WhatsApp con el pedido listo. Ahí podrás pasar tus datos y dirección.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-      </div>
+        function renderModal() {
+            if (!state.showResumeModal) return '';
+            return `
+                <div class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+                    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in">
+                        <div class="flex flex-col items-center text-center mb-6">
+                            <div class="bg-yellow-100 p-3 rounded-full mb-4">
+                                <i data-lucide="alert-circle" class="text-yellow-600" width="32" height="32"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900">¿Querés continuar tu compra?</h3>
+                            <p class="text-gray-600 mt-2">Encontramos productos que elegiste en tu visita anterior.</p>
+                        </div>
+                        <div class="space-y-3">
+                            <button onclick="handleResumeCart()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition-colors">Sí, recuperar productos</button>
+                            <button onclick="handleNewCart()" class="w-full bg-gray-100 text-gray-600 py-3 rounded-lg font-bold hover:bg-gray-200 transition-colors">No, empezar de cero</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
 
-      {/* Footer / Créditos */}
-      <footer className="w-full text-center py-6 mt-4 border-t border-gray-200">
-        <p className="text-gray-500 text-sm mb-1">
-          © 2026 {CONFIG.nombreNegocio}. Todos los derechos reservados.
-        </p>
-        <p className="text-gray-500 text-sm">
-          Sitio hecho por <a href="https://www.juanmartinbarrientos.com/" target="_blank" rel="noopener noreferrer" className="font-bold text-green-800 hover:underline">JMB</a>
-        </p>
-      </footer>
-    </div>
-  );
-};
+        function renderNotification() {
+            if (!state.mensajeExito) return '';
+            return `
+                <div class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-xl z-50 font-medium flex items-center gap-2 animate-bounce">
+                    <i data-lucide="check" width="20" height="20"></i> ¡Producto agregado!
+                </div>
+            `;
+        }
 
-export default CarniceriaApp;
+        function renderProductList() {
+            const filtered = PRODUCTOS.filter(p => p.nombre.toLowerCase().includes(state.busqueda.toLowerCase()));
+            
+            let html = `
+                <div class="p-4 max-w-md mx-auto">
+                    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6 rounded shadow-sm">
+                        <p class="font-bold text-lg mb-2">🛒 ¿Cómo hacer tu pedido?</p>
+                        <ul class="space-y-2 text-sm">
+                            <li>1. Primero tocá el peso que querés (1/4, 1/2, 1 kilo, etc).</li>
+                            <li><strong>2. Tocá el botón verde "AGREGAR". Si querés llevar más cantidad (por ejemplo 2 kilos), volvé a tocar el botón las veces que necesites.</strong></li>
+                            <li>3. Cuando termines de elegir todo, tocá el dibujo del changuito arriba a la derecha.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Buscador -->
+                    <div class="mb-6 relative">
+                        <i data-lucide="search" class="absolute left-3 top-3.5 text-gray-400" width="20" height="20"></i>
+                        <input 
+                            type="text" 
+                            placeholder="¿Qué estás buscando? (Ej: Asado)" 
+                            class="w-full p-3 pl-10 border-2 border-green-600 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-green-400 bg-white"
+                            value="${state.busqueda}"
+                            oninput="actualizarBusqueda(this.value)"
+                        >
+                        ${state.busqueda ? `<button onclick="actualizarBusqueda('')" class="absolute right-3 top-3.5 text-gray-400"><i data-lucide="x" width="20" height="20"></i></button>` : ''}
+                    </div>
+            `;
+
+            if (filtered.length === 0) {
+                html += `
+                    <div class="text-center py-8 text-gray-500">
+                        <p class="text-lg">No encontramos productos con ese nombre.</p>
+                        <button onclick="actualizarBusqueda('')" class="mt-2 text-green-700 font-bold underline">Ver todos los productos</button>
+                    </div>
+                `;
+            } else {
+                html += filtered.map(prod => {
+                    const currentPeso = state.pesosSeleccionados[prod.id] || 1.00;
+                    const precioEstimado = prod.precioKg * currentPeso;
+                    
+                    return `
+                    <div class="bg-white rounded-lg shadow-md border border-gray-200 p-4 mb-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-lg font-bold text-gray-800">${prod.nombre}</h3>
+                            <span class="bg-green-100 text-green-800 text-sm font-semibold px-2 py-1 rounded">${formatPrecio(prod.precioKg)}/kg</span>
+                        </div>
+                        
+                        <div class="text-gray-600 text-sm mb-3">Seleccioná la cantidad:</div>
+
+                        <div class="grid grid-cols-4 gap-2 mb-4">
+                            ${OPCIONES_PESO.map(op => `
+                                <button
+                                    onclick="updatePeso(${prod.id}, ${op.valor})"
+                                    class="py-2 text-sm rounded-md font-medium transition-colors ${currentPeso === op.valor ? 'bg-green-700 text-white shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}"
+                                >
+                                    ${op.label}
+                                </button>
+                            `).join('')}
+                        </div>
+
+                        <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                            <div class="text-sm text-gray-600">
+                                Total estimado:<br/>
+                                <span class="text-lg font-bold text-gray-900">${formatPrecio(precioEstimado)}</span>
+                            </div>
+                            <button onclick="agregarAlCarrito(${prod.id})" class="bg-green-600 active:bg-green-700 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm">
+                                <i data-lucide="plus" width="20" height="20"></i> AGREGAR
+                            </button>
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+            }
+
+            html += `</div>`; // Cerrar container list
+
+            // Floating cart button
+            if (state.carrito.length > 0) {
+                const total = calcularTotalProductos();
+                html += `
+                    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg z-40 max-w-md mx-auto">
+                        <button onclick="cambiarVista('carrito')" class="w-full bg-green-800 text-white py-3 rounded-xl font-bold text-lg shadow-md flex justify-between px-6">
+                            <span>Ver mi Pedido (${state.carrito.length})</span>
+                            <span>${formatPrecio(total)}</span>
+                        </button>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        function renderCarritoView() {
+            if (state.carrito.length === 0) {
+                return `
+                    <div class="max-w-md mx-auto bg-white min-h-screen">
+                        <div class="bg-gray-100 p-4 flex items-center gap-4 sticky top-0 shadow-sm z-10">
+                            <button onclick="cambiarVista('tienda')" class="p-2 bg-white rounded-full shadow text-gray-700">
+                                <i data-lucide="arrow-left" width="24" height="24"></i>
+                            </button>
+                            <h2 class="text-xl font-bold text-gray-800">Tu Pedido</h2>
+                        </div>
+                        <div class="text-center py-10 text-gray-500 p-4">
+                            <div class="flex justify-center mb-4 text-gray-300">
+                                <i data-lucide="shopping-cart" width="64" height="64"></i>
+                            </div>
+                            <p class="text-lg">El carrito está vacío</p>
+                            <button onclick="cambiarVista('tienda')" class="mt-4 text-green-700 font-bold underline">Volver a ver productos</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const totalProductos = calcularTotalProductos();
+            const costoEnvio = calcularCostoEnvio();
+            const totalFinal = calcularTotalFinal();
+
+            let html = `
+                <div class="max-w-md mx-auto bg-white min-h-screen">
+                    <div class="bg-gray-100 p-4 flex items-center gap-4 sticky top-0 shadow-sm z-10">
+                        <button onclick="cambiarVista('tienda')" class="p-2 bg-white rounded-full shadow text-gray-700">
+                            <i data-lucide="arrow-left" width="24" height="24"></i>
+                        </button>
+                        <h2 class="text-xl font-bold text-gray-800">Tu Pedido</h2>
+                    </div>
+
+                    <div class="p-4 pb-32"> <!-- Padding bottom extra para el footer -->
+                        <div class="space-y-4 mb-8">
+                            ${state.carrito.map(item => {
+                                const pesoOption = OPCIONES_PESO.find(o => o.valor === item.pesoSeleccionado);
+                                const labelPeso = pesoOption ? pesoOption.label : `${item.pesoSeleccionado}kg`;
+                                const precioItem = item.precioKg * item.pesoSeleccionado * item.cantidad;
+                                return `
+                                    <div class="flex justify-between items-center border-b border-gray-100 pb-4">
+                                        <div>
+                                            <h4 class="font-bold text-lg">${item.nombre}</h4>
+                                            <div class="text-gray-600">
+                                                ${item.cantidad} x ${labelPeso} <span class="text-xs text-gray-400">(${formatPrecio(item.precioKg)}/kg)</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <span class="font-bold text-lg text-gray-800">${formatPrecio(precioItem)}</span>
+                                            <button onclick="eliminarDelCarrito(${item.cartId})" class="bg-red-50 text-red-600 p-2 rounded-full">
+                                                <i data-lucide="trash-2" width="20" height="20"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        <div class="bg-gray-50 p-4 rounded-xl mb-6">
+                            <h3 class="font-bold text-lg mb-3">¿Cómo querés recibirlo?</h3>
+                            <div class="flex gap-2">
+                                <button onclick="cambiarEntrega('retiro')" class="flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 ${state.tipoEntrega === 'retiro' ? 'border-green-700 bg-green-50 text-green-900' : 'border-gray-200 bg-white text-gray-500'}">
+                                    <i data-lucide="store" width="24" height="24"></i>
+                                    <span class="font-bold text-sm">Retiro en Local</span>
+                                </button>
+                                <button onclick="cambiarEntrega('domicilio')" class="flex-1 p-3 rounded-lg border-2 flex flex-col items-center gap-2 ${state.tipoEntrega === 'domicilio' ? 'border-green-700 bg-green-50 text-green-900' : 'border-gray-200 bg-white text-gray-500'}">
+                                    <i data-lucide="truck" width="24" height="24"></i>
+                                    <span class="font-bold text-sm">Envío a Casa</span>
+                                </button>
+                            </div>
+
+                            ${state.tipoEntrega === 'domicilio' ? `
+                                <div class="mt-3 text-sm text-gray-600 bg-white p-3 rounded border border-gray-200">
+                                    ${totalProductos >= CONFIG.montoEnvioGratis ? 
+                                        `<span class="text-green-600 font-bold flex items-center gap-1"><i data-lucide="check" width="16" height="16"></i> ¡Tenés envío GRATIS!</span>` :
+                                        `<span>Costo de envío estimado: <strong>${formatPrecio(CONFIG.costoEnvio)}</strong><br/><span class="text-xs text-orange-600">Faltan ${formatPrecio(CONFIG.montoEnvioGratis - totalProductos)} para envío gratis.</span></span>`
+                                    }
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="border-t border-gray-200 pt-4 space-y-2 text-lg">
+                            <div class="flex justify-between text-gray-600">
+                                <span>Subtotal</span>
+                                <span>${formatPrecio(totalProductos)}</span>
+                            </div>
+                            ${state.tipoEntrega === 'domicilio' ? `
+                                <div class="flex justify-between text-gray-600">
+                                    <span>Envío (estimado)</span>
+                                    <span>${costoEnvio === 0 ? 'Bonificado' : formatPrecio(costoEnvio)}</span>
+                                </div>
+                            ` : ''}
+                            <div class="flex justify-between font-bold text-2xl text-gray-900 pt-2">
+                                <span>Total Estimado</span>
+                                <span>${formatPrecio(totalFinal)}</span>
+                            </div>
+                            <p class="text-xs text-center text-gray-500 mt-2">* El costo final y el pago se coordinan por WhatsApp</p>
+                        </div>
+
+                        <button onclick="enviarPedidoWhatsApp()" class="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 animate-pulse mt-8">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WA" class="w-6 h-6" />
+                            ENVIAR PEDIDO A WHATSAPP
+                        </button>
+                        <p class="text-center text-sm text-gray-500 mt-4 px-4">Al tocar el botón se abrirá WhatsApp con el pedido listo. Ahí podrás pasar tus datos y dirección.</p>
+                    </div>
+                </div>
+            `;
+            return html;
+        }
+
+        function renderFooter() {
+            return `
+                <footer class="w-full text-center py-6 mt-4 border-t border-gray-200">
+                    <p class="text-gray-500 text-sm mb-1">© 2026 ${CONFIG.nombreNegocio}. Todos los derechos reservados.</p>
+                    <p class="text-gray-500 text-sm">Sitio hecho por <a href="https://www.juanmartinbarrientos.com/" target="_blank" rel="noopener noreferrer" class="font-bold text-green-800 hover:underline">JMB</a></p>
+                </footer>
+            `;
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            let content = '';
+
+            // Modal
+            content += renderModal();
+            content += renderNotification();
+
+            if (state.vista === 'tienda') {
+                content += `<div>${renderHeader()}${renderProductList()}</div>`;
+            } else {
+                content += `<div>${renderCarritoView()}</div>`;
+            }
+
+            content += renderFooter();
+
+            app.innerHTML = content;
+            
+            // Re-inicializar iconos de Lucide
+            lucide.createIcons();
+        }
+
+        // --- INICIALIZACIÓN ---
+        init();
+
+    </script>
+</body>
+</html>
